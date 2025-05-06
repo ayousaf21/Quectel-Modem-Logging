@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# Device IPs 
+devices=("192.168.10.4" "192.168.20.4" "192.168.30.4" "192.168.40.4")
+
+QLOG_PID=()
+
+# Directory to save logs
+log_dir="/home/unix/quectel_logs"
+pid_dir="/home/unix/qlog"
+
+# Script Logs
+log_file="/home/unix/quectel_logs/modem.logs"
+error_file="/home/unix/quectel_logs/modem_error.logs"
+
+# QLog command
+qlog_command="QLog -q -s"
+
+for device in "${devices[@]}"; do
+	echo "root@$device" 1>> $log_file 2>> $error_file
+	if $(ssh -o StrictHostKeyChecking=no root@$device "! [  -d /data/quectel ]" 1>> $log_file 2>> $error_file) 
+	then
+		echo "Directory does not exists" 1>> $log_file 2>> $error_file
+		ssh -o StrictHostKeyChecking=no root@$device "mkdir /data/quectel" 1>> $log_file 2>> $error_file
+	fi
+
+	echo "Directory exits" 1>> $log_file 2>> $error_file
+	ssh -o StrictHostKeyChecking=no root@$device "cd /data" 1>> $log_file 2>> $error_file    
+    # Run QLog command via SSH
+	ssh -o StrictHostKeyChecking=no root@$device "$qlog_command /data/quectel" 1>> $log_file 2>> $error_file & 
+	QLOG_PID+=("$(ssh -o StrictHostKeyChecking=no root@$device "echo $!")") 1>> $log_file 2>> $error_file
+	echo "PID is ${QLOG_PID[@]}" 1>> $log_file 2>> $error_file
+
+done
+
+sleep 1200
+
+ps 1>> $log_file 2>> $error_file
+# Stop background processes for all Devices to avoid mem full
+kill ${QLOG_PID[@]} 1>> $log_file 2>> $error_file
+
+for device in "${devices[@]}"; do
+    	# Copy the log file
+	scp -o StrictHostKeyChecking=no -r root@$device:/data/quectel/ "$log_dir/$device" 1>> $log_file 2>> $error_file
+done
+
+for device in "${devices[@]}"; do
+        # Remove log files from SBPi
+        ssh -o StrictHostKeyChecking=no root@$device "rm /data/quectel/*.qmdl" 1>> $log_file 2>> $error_file
+
+done
+
+ps 1>> $log_file 2>> $error_file
+
+delete_oldest_files() {
+    for device in "${devices[@]}"; do
+        find "$log_dir/$device/quectel" -type f -printf '%T+ %p\n' | sort | head -n 1 | cut -d' ' -f2- | xargs rm -f
+    done
+}
+
+
+DIR_SIZE=$(du -sBG $log_dir | cut -f1 | sed 's/G//')
+# Check if size exceed 80G, delete log files
+while [ "$DIR_SIZE" -gt "80" ]
+do
+
+    echo "Memory getting full.. deleting logs"
+    # Remove log files from SBP
+    delete_oldest_files
+    DIR_SIZE=$(du -sBG $log_dir | cut -f1 | sed 's/G//')
+
+done
+
+exit 0
+
