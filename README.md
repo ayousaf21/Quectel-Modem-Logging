@@ -1,6 +1,8 @@
 # 🎛️ **Quectel Modem Logging**
 This repository provides scripts and configurations to facilitate the logging of Quectel Modem EG21 using the QLog tool. It's designed to assist in debugging cellular disconnections and related issues on Quectel modems, particularly when integrated with *i.MX Yocto* platforms.
 
+![QLog](https://github.com/user-attachments/assets/a34bb16e-1f6a-4461-aa14-8a340638422e)
+
 ## ⚙️ **Features**
 - Bash Script to automate the process of starting and stopping QLog, managing log files, and handling modem interfaces.
 - Configuration Files and predefined settings for QLog to filter and capture relevant log data.
